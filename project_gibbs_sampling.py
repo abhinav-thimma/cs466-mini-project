@@ -4,7 +4,7 @@ import os
 import time
 from multiprocessing import Process
 
-
+MULTI_THREADED = False
 INDEX_MAP = {'A':0,'C':1,'G':2,'T':3}
 PRINT_EPOCH = 500
 ITER = 500
@@ -25,6 +25,9 @@ def construct_PWM(sites):
   return matrix   
 
 def get_source_nucleotide_distrib(sequences):
+  '''
+  This function takes the set of nucleotide sequences and generates a distribution of nucleotides
+  '''
   combined_sequence = ''.join(sequences)
   a_prob = combined_sequence.count('A')/len(combined_sequence)
   c_prob = combined_sequence.count('C')/len(combined_sequence)
@@ -34,6 +37,9 @@ def get_source_nucleotide_distrib(sequences):
   return {'A': a_prob,'C': c_prob,'G': g_prob,'T': t_prob}
 
 def calculate_icpc(motif):
+  '''
+  Calculates the ICPC of a motif by taking the background distribution as uniform
+  '''
   s = 0
   for row in motif:
     for nucleotide_prob in row:
@@ -46,6 +52,8 @@ def gibbs_sampling(sequences, ml):
   '''
   sequences: random sc nucleotide sequnces obtained form benchmark dataset
   ml: motif_length
+
+  This function runs gibbs sampling on one dataset and returns the final PWM and sites
 
   Returns:
   predicted_pwm = motif pwm matrix (ml,4)
@@ -101,7 +109,7 @@ def gibbs_sampling(sequences, ml):
 
 def motif_finding(dataset_path):
   '''
-  Runs gibbs sampling on one dataset for ITER iterations and returns run time
+  This function takes the dataset_path, extracts the sequences and motiflength and runs the gibbs sampling
   '''
   
   sequences = []
@@ -126,6 +134,9 @@ def motif_finding(dataset_path):
   return end_time - start_time, predicted_pwm, predicted_sites
 
 def store_motif_finding_results(dataset_path, predicted_sites, predicted_pwm, best_run_time):
+  '''
+  This function stores the predicted sites, predicted motif PWM and average run time for a single dataset
+  '''
   ml = 0
   with open(dataset_path+'/motiflength.txt') as fp:
     ml = int(fp.read().strip())
@@ -145,7 +156,11 @@ def store_motif_finding_results(dataset_path, predicted_sites, predicted_pwm, be
     fp.write(str(best_run_time))
 
 
-def proc(dataset_path):
+def thread_process(dataset_path):
+  '''
+  This function is run in a thread.
+  It runs gibbs sampling algorithm 200 times on a given dataset and stores the best results
+  '''
   best_score, best_run_time, best_predicted_pwm, best_predicted_sites = 0, 0, None, []
   avg_runtime = 0.0
 
@@ -169,11 +184,13 @@ if __name__ == '__main__':
   for name in paths:
     dataset_path = "./datasets/" + name
     print(dataset_path)
-    p = Process(target=proc, args=(dataset_path,))
-    process_list.append(p)
+    if(MULTI_THREADED):
+      p = Process(target=thread_process, args=(dataset_path,))
+      process_list.append(p)
+      p.start()
+    else:
+      thread_process(dataset_path)
 
-    p.start()
-
-
-  for p in process_list:
-    p.join()
+  if(MULTI_THREADED):
+    for p in process_list:
+      p.join()
